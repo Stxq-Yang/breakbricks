@@ -1,5 +1,8 @@
-#include <iostream>
+#include <string>
 #include <windows.h>
+#ifdef VC_CL_COMPILER
+#program comment (lib,"gdi32.lib")
+#endif
 bool run=true;
 HINSTANCE hInstance = GetModuleHandle (0);
 std::string title="Game2";
@@ -56,9 +59,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 		    Ball.y-=Ball.sy;
 		    if (time%70==0)
                 Ball.sy-=1;
-		    if (((Ball.x-Ball.r<= Broad.x+Broad.l && Ball.x-Ball.r>= Broad.x)||
-               (Ball.x+Ball.r<= Broad.x+Broad.l && Ball.x+Ball.r>= Broad.x))
-                &&(Ball.y-Ball.r<=Broad.y&&Ball.y-Ball.r>=Broad.y-Broad.h)){
+		    if (((Ball.x+Ball.r<= Broad.x+Broad.l && Ball.x-Ball.r>= Broad.x)
+                &&(Ball.y+Ball.r>=Broad.y&&Ball.y-Ball.r<=Broad.y+Broad.h)){
                 Ball.sx=-Ball.sy;//+int((Ball.x-Broad.x)/4)
                 Ball.sy=-Ball.sx;
             }
