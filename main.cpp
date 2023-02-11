@@ -1,5 +1,7 @@
 #include <string>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #ifdef VC_CL_COMPILER
 #program comment (lib,"gdi32.lib")
 #endif
