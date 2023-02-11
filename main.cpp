@@ -1,9 +1,8 @@
 #include <string>
 #ifdef _WIN32
 #include <windows.h>
-#endif
 #ifdef VC_CL_COMPILER
-#program comment (lib,"gdi32.lib")
+#pragma comment (lib,"gdi32.lib")
 #endif
 bool run=true;
 HINSTANCE hInstance = GetModuleHandle (0);
@@ -156,3 +155,6 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     return 0;
 }
+#else
+#error This application cannot run and compile in linux
+#endif
