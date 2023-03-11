@@ -1,10 +1,15 @@
 #include <string>
+#include <vector>
+#include <time.h>
+#include <stdlib.h>
+#include <algorithm>
 #ifdef _WIN32
 #include <windows.h>
 #ifdef VC_CL_COMPILER
 #pragma comment (lib,"gdi32.lib")
 #endif
 bool run=true;
+bool init=false;
 HINSTANCE hInstance = GetModuleHandle (0);
 std::string title="Game2";
 LPCSTR Icon= IDI_APPLICATION;
@@ -18,7 +23,7 @@ public:
     int r=5;
     int sx=0;
     int sy=0;
-    paint(HDC hdc){
+    void paint(HDC hdc){
         HBRUSH hBrush1 =  CreateSolidBrush(RGB(255,255,255));
         SelectObject(hdc, hBrush1);
         Ellipse(hdc,x+r,y+r,x-r,y-r);
@@ -28,10 +33,14 @@ public:
 class broad{
 public:
     int x=285;
-    int y=325;
+    int y=323;
     int l=70;
     int h=7;
-    paint(HDC hdc){
+    int xa=0;
+    int ya=0;
+    void paint(HDC hdc){
+        x+=xa;
+        y+=ya;
         RECT rect;
         rect.left=x;
         rect.top=y;
@@ -40,49 +49,85 @@ public:
         HBRUSH hBrush1 =  CreateSolidBrush(RGB(255,255,255));
         FillRect(hdc,&rect,hBrush1);
         DeleteObject(hBrush1);
+        xa=0;
+        ya=0;
     }
 };
+class brick{
+public:
+    RECT rect;
+    void paint(HDC hdc){
+        HBRUSH hBrush1 =  CreateSolidBrush(RGB(255,255,0));
+        FillRect(hdc,&rect,hBrush1);
+        DeleteObject(hBrush1);
+    }
+};
+bool operator==(brick a,const brick b){
+    return a.rect.top==b.rect.top&&a.rect.left==b.rect.left&&a.rect.right==b.rect.right&&a.rect.bottom==b.rect.bottom;
+}
 ball Ball;
 broad Broad;
-void paint(HWND hwnd){
-     PAINTSTRUCT ps;
-     HDC hdc = BeginPaint(hwnd, &ps);
-     Ball.paint(hdc);
-     Broad.paint(hdc);
-     EndPaint(hwnd, &ps);
-}
-int time=0;
+HBITMAP hBackbuffer;
+HDC hBackbufferDC;
+bool start=false;
+unsigned long long tick=0;
 int score=0;
+std::vector <RECT> rects;
+std::vector <brick> Bricks;
+unsigned long long sseed(){
+    timeb t;
+	ftime(&t);
+	return t.time*1000+t.millitm;
+}
+void initgames(){
+    Broad.x=285;
+    Broad.y=323;
+    Broad.l=70;
+    Broad.h=7;
+    Broad.xa=0;
+    Broad.ya=0;
+    Ball.x=320;
+    Ball.y=320;
+    Ball.r=5;
+    Ball.sx=0;
+    Ball.sy=0;
+    score=0;
+    Bricks.clear();
+    std::vector <RECT>rectsc(rects);
+    srand(sseed());
+    for (unsigned int i=0;i<=rand()%rects.size();i++){
+        srand(sseed());
+
+        int j=rand()%rectsc.size();
+        brick Brick;
+        Brick.rect=rects[j];
+        rectsc.erase(rectsc.begin()+j);
+        Bricks.push_back(Brick);
+    }
+    start=true;
+
+}
 LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
 	switch(Message) {
-		case WM_PAINT: {
-		    Ball.x-=Ball.sx;
-		    Ball.y-=Ball.sy;
-		    if (time%70==0)
-                Ball.sy-=1;
-		    if (((Ball.x+Ball.r<= Broad.x+Broad.l && Ball.x-Ball.r>= Broad.x)
-                &&(Ball.y+Ball.r>=Broad.y&&Ball.y-Ball.r<=Broad.y+Broad.h)){
-                Ball.sx=-Ball.sy;//+int((Ball.x-Broad.x)/4)
-                Ball.sy=-Ball.sx;
-            }
-            if(Ball.x-Ball.r<=0||Ball.x+Ball.r>=640||Ball.y-Ball.r>=0){
-                Ball.sx=-Ball.sy;
-                Ball.sy=-Ball.sx;
-            }
-		    paint(hwnd);
-			break;
-		}
 		/* Upon destruction, tell the main thread to stop */
 		case WM_KEYDOWN:{
             switch(wParam){
                 case VK_RIGHT:{
-                    if (Broad.x+80<640){
-                        Broad.x+=10;
+                    if (Broad.x+80<640&&start){
+                        Broad.xa+=10;
+                    }else if(start){
+                        Broad.xa+=640-70-(Broad.x+Broad.xa);
                     }
                     break;
                 }case VK_LEFT:{
-                    if (Broad.x-10>=0){
-                        Broad.x-=10;
+                    if (Broad.x-10>=0&&start){
+                        Broad.xa-=10;
+                    }
+                    break;
+                }case VK_SPACE:{
+                    if((!start)&&init){
+                        CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)initgames,NULL,true,0);
+
                     }
                     break;
                 }
@@ -91,6 +136,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 		}
 		case WM_DESTROY: {
 			PostQuitMessage(0);
+			run=false;
 			break;
 		}
 
@@ -100,12 +146,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 	}
 	return 0;
 }
+
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
                    LPSTR lpCmdLine,
                    int nCmdShow){
-
-
     memset(&wc,0,sizeof(wc));
     wc.cbSize		 = sizeof(WNDCLASSEX);
     wc.lpfnWndProc	 = (WNDPROC)WndProc; /* This is where we will send messages to */
@@ -113,10 +158,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
     wc.hCursor		 = LoadCursor(hInstance,Cursor);
 
     /* White, COLOR_WINDOW is just a #define for a system color, try Ctrl+Clicking it */
-    wc.hbrBackground = CreateSolidBrush(0x000000);
+    wc.hbrBackground = CreateSolidBrush(0xFFFFFF);
     wc.lpszClassName = "WindowClass";
     wc.hIcon		 = LoadIcon(0, Icon); /* Load a standard icon */
-    wc.hIconSm		 = LoadIcon(0, Cursor); /* use the name "A" to use the project icon */
+    wc.hIconSm		 = LoadIcon(0, Icon); /* use the name "A" to use the project icon */
 
     if(!RegisterClassEx(&wc)) {
         MessageBox(NULL, "Window Registration Failed!","Error!",MB_ICONEXCLAMATION|MB_OK);
@@ -135,26 +180,140 @@ int WINAPI WinMain(HINSTANCE hInstance,
         return -2;
     }
     MSG msg;
+    HDC hdc = GetDC(hwnd);
+    hBackbuffer= CreateCompatibleBitmap(hdc, 640, 480);
+    hBackbufferDC=CreateCompatibleDC(hdc);
+    std::vector <int>xlis;
+    for (int i=20;i<=640-20;i+=20){
+        xlis.push_back(i);
+    }
+    std::vector <int>ylis;
+    for (int i=10;i<=200-10;i+=10){
+        ylis.push_back(i);
+    }
+
+    for (auto x:xlis){
+        for (auto y:ylis){
+            RECT rect;
+            rect.top=y;
+            rect.left=x;
+            rect.bottom=y+10;
+            rect.right=x+20;
+            rects.push_back(rect);
+        }
+    }
+    int FPS=0;
+    init=true;
+    unsigned long long lasttick=0;
+    unsigned long long lasttime=time(0);
     while(run) {
-        if(GetMessage(&msg, NULL, 0, 0)>0){
+        if(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)){
             TranslateMessage(&msg);
             DispatchMessage(&msg);
-
         }else{
-            run=false;
-        }
-        RECT rectw;
-        rectw.top=0;
-        rectw.left=0;
-        rectw.right=640;
-        rectw.bottom=480;
-        InvalidateRect(hwnd,&rectw,true);
-        Sleep(3);
-        time+=3;
-	}
+            if (start){
+                if (Ball.sx>=3)
+                    Ball.sx=3;
+                if (Ball.sy>=4)
+                    Ball.sy=4;
+                Ball.x-=Ball.sx;
+                Ball.y-=Ball.sy;
+                if ((Ball.x+Ball.r<= Broad.x+Broad.l && Ball.x-Ball.r>= Broad.x)
+                    &&(Ball.y+Ball.r>=Broad.y&&Ball.y-Ball.r<=Broad.y+Broad.h)){
+                    Ball.sx=-(2*Ball.x-2*Broad.x-Broad.l)/30;
+                    Ball.sy=-Ball.sy+2 ;
+                }
+                if(Ball.x-Ball.r-Ball.sx<=0)
+                    Ball.sx=-Ball.sx;
+                if (Ball.x+Ball.r+Ball.sx>=640)
+                    Ball.sx=3;
+                if (Ball.y-Ball.r-Ball.sy<=0){
+                    Ball.sy=-Ball.sy;
+                }
+                if (Ball.y+Ball.r>=480){
+                    Broad.x=285;
+                    Broad.y=3232 ;
+                    Broad.l=70;
+                    Broad.h=7;
+                    Broad.xa=0;
+                    Broad.ya=0;
+                    Ball.x=320;
+                    Ball.y=320;
+                    Ball.r=5;
+                    Ball.sx=0;
+                    Ball.sy=0;
+                    start=false;
+                }
+                if(Bricks.size()){
+                    for (auto iter=Bricks.begin();iter!=Bricks.end();){
+                        if(PtInRect(&iter->rect,{Ball.x+Ball.r,Ball.y+Ball.r})
+                           ||PtInRect(&iter->rect,{Ball.x,Ball.y-Ball.r})
+                           ||PtInRect(&iter->rect,{Ball.x-Ball.r,Ball.y})
+                           ||PtInRect(&iter->rect,{Ball.x,Ball.y-Ball.r})){
+                            iter=Bricks.erase(iter);
+                            score+=1;
+                        }else{
+                            iter++;
+                        }
+                    }
+                }else{
+                    start=false;
+                }
 
+
+
+            }
+            SelectObject(hBackbufferDC, hBackbuffer);
+            std::wstring infos;
+            infos=L"score:"+std::to_wstring(score)+L" FPS : "+std::to_wstring(FPS);
+            HBRUSH Brush1 =  CreateSolidBrush(RGB(0,0,0));
+            SelectObject(hBackbufferDC, Brush1);
+            Rectangle(hBackbufferDC,0, 0, 640, 480);
+            DeleteObject(Brush1);
+            Ball.paint(hBackbufferDC);
+            Broad.paint(hBackbufferDC);
+            HFONT font=CreateFontW(
+                            13,                                    //   字体的高度
+                            0,                                          //   字体的宽度
+                            0,                                          //  nEscapement
+                            0,                                          //  nOrientation
+                            FW_NORMAL,                                  //   nWeight
+                            FALSE,                                      //   bItalic
+                            FALSE,                                      //   bUnderline
+                            0,                                                   //   cStrikeOut
+                            ANSI_CHARSET,                             //   nCharSet
+                            OUT_DEFAULT_PRECIS,                 //   nOutPrecision
+                            CLIP_DEFAULT_PRECIS,               //   nClipPrecision
+                            DEFAULT_QUALITY,                       //   nQuality
+                            DEFAULT_PITCH   |   FF_SWISS,     //   nPitchAndFamily
+                            L"宋体");
+            SelectObject(hBackbufferDC,font);
+            SetTextColor(hBackbufferDC,RGB(255,255,255));
+            SetBkMode(hBackbufferDC,TRANSPARENT);
+            TextOutW(hBackbufferDC,20,400,infos.c_str(),infos.length());
+            DeleteObject(font);
+            for (auto i:Bricks){
+                i.paint(hBackbufferDC);
+            }
+
+            BitBlt(hdc, 0, 0, 640, 480,
+                    hBackbufferDC, 0, 0,
+                    SRCCOPY);
+            Sleep(10);
+            unsigned long long nowtime=time(0);
+            if(nowtime-lasttime>=1){
+                FPS=tick-lasttick;
+                lasttick=tick;
+                lasttime=nowtime;
+            }
+            tick+=1;
+        }
+	}
+    DeleteObject(hBackbuffer);
+    ReleaseDC(hwnd, hdc); //retrieved device contexts are just released
+	DeleteDC(hBackbufferDC);
     return 0;
 }
 #else
-#error This application cannot run and compile in linux
+#error This application only can run and compile in windows
 #endif
